@@ -1,0 +1,181 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  labels:
+    app.kubernetes.io/name: proxy
+spec:
+  nodeSelector:
+    disktype: ssd  
+  volumes:
+  - name: myvol
+    persistentVolumeClaim:
+      claimName: pvc-hostpath-claim
+  - name: tmpVol
+    emptyDir: {}
+  containers:
+  - name: nginx
+    image: nginx:stable
+    imagePullPolicy: IfNotPresent
+    resources: {}
+    command: ["/bin/bash", "-c", "sleep 100000"]
+    volumeMounts:
+    - mountPath: "/mnt/readonly"
+      name: myvol    
+    env:
+    - name: PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: se1
+          key: password
+    tolerations:
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 300
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app.kubernetes.io/name: proxy
+  ports:
+  - name: name-of-service-port
+    protocol: TCP
+    port: 80
+    targetPort: http-web-svc
+  type: NodePort
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-hostpath-1gb
+spec:
+  capacity:
+    storage: 1Gi 
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: aws-ebs
+  hostPath:
+    path: /tmp
+
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvc-hostpath-claim
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: aws-ebs
+  resources:
+    requests:
+      storage: 512Mi
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: aws-ebs
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: io1
+reclaimPolicy: Delete
+allowVolumeExpansion: false
+mountOptions:
+  - debug
+volumeBindingMode: Immediate
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mying
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    #nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - www1.rhce.cc
+    secretName: hello-app-tls
+  rules:
+  - host: www1.rhce.cc
+    http:
+      paths:
+      - path: /
+        backend:
+          service:
+            name: nginx1
+            port:
+              number: 80
+        pathType: Prefix
+      - path: /cka
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx3
+            port:
+              number: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: db  #empty for all pods
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 172.17.0.0/16
+            except:
+              - 172.17.1.0/24
+        - namespaceSelector:
+            matchLabels:
+              project: myproject
+        - podSelector:
+            matchLabels:
+              role: frontend
+      ports:
+        - protocol: TCP
+          port: 6379
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/24
+      ports:
+        - protocol: TCP
+          port: 5978
+
+---
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: myuser
+spec:
+  request: LS0tLS1CRUdJTiBDRVJUSUZJQ0FUxxxx  # base64 encoding on  john.csr 
+  signerName: kubernetes.io/kube-apiserver-client
+  expirationSeconds: 86400  # one day
+  usages:
+  - client auth
