@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  labels:
+    app.kubernetes.io/name: proxy
+spec:
+  nodeSelector:
+    disktype: ssd  
+  volumes:
+  - name: myvol
+    persistentVolumeClaim:
+      claimName: pvc-hostpath-claim
+  - name: tmpVol
+    emptyDir: {}
+  containers:
+  - name: nginx
+    image: nginx:stable
+    imagePullPolicy: IfNotPresent
+    resources: {}
+    command: ["/bin/bash", "-c", "sleep 100000"]
+    volumeMounts:
+    - mountPath: "/mnt/readonly"
+      name: myvol
+    env:
+    - name: PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: se1
+          key: password
+    tolerations:
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 300

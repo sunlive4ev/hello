@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mying
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    #nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - www1.rhce.cc
+    secretName: hello-app-tls
+  rules:
+  - host: www1.rhce.cc
+    http:
+      paths:
+      - path: /
+        backend:
+          service:
+            name: nginx1
+            port:
+              number: 80
+        pathType: Prefix
+      - path: /cka
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx3
+            port:
+              number: 80
