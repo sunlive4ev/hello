@@ -28,11 +28,11 @@ spec:
         secretKeyRef:
           name: se1
           key: password
-    tolerations:
-    - effect: NoExecute
-      key: node.kubernetes.io/not-ready
-      operator: Exists
-      tolerationSeconds: 300
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
 
 ---
 apiVersion: v1
