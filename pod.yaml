@@ -19,6 +19,9 @@ spec:
     imagePullPolicy: IfNotPresent
     resources: {}
     command: ["/bin/bash", "-c", "sleep 100000"]
+    securityContext:
+      allowPrivilegeEscalation: false
+      privileged: false
     volumeMounts:
     - mountPath: "/mnt/readonly"
       name: myvol
